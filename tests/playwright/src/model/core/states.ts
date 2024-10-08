@@ -25,6 +25,7 @@ export enum ContainerState {
   Deleting = 'DELETING',
   Created = 'CREATED',
   Paused = 'PAUSED',
+  Stopped = 'STOPPED',
   Unknown = 'UNKNOWN',
 }
 
@@ -40,5 +41,22 @@ export enum PodState {
   Restarting = 'RESTARTING',
   Degraded = 'DEGRADED',
   Paused = 'PAUSED',
+  Unknown = 'UNKNOWN',
+}
+
+export enum VolumeState {
+  Used = 'USED',
+  Unused = 'UNUSED',
+}
+
+export enum ResourceElementState {
+  Running = 'RUNNING',
+  Off = 'OFF',
+  Starting = 'STARTING',
+}
+
+export enum KubernetesResourceState {
+  Running = 'RUNNING',
+  Stopped = 'STOPPED',
   Unknown = 'UNKNOWN',
 }

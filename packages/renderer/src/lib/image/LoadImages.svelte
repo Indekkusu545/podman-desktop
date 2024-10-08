@@ -8,7 +8,6 @@ import { get } from 'svelte/store';
 import { router } from 'tinro';
 
 import { providerInfos } from '/@/stores/providers';
-import { createTask } from '/@/stores/tasks';
 import type { ProviderContainerConnectionInfo, ProviderInfo } from '/@api/provider-info';
 
 import EngineFormPage from '../ui/EngineFormPage.svelte';
@@ -60,8 +59,6 @@ async function loadImages() {
 
   inProgress = true;
 
-  const task = createTask('Load images');
-
   for (const archive of archivesToLoad) {
     try {
       await window.loadImages({
@@ -75,13 +72,7 @@ async function loadImages() {
 
   inProgress = false;
   if (loadError === '') {
-    task.status = 'success';
-    task.state = 'completed';
     router.goto('/images');
-  } else {
-    task.status = 'failure';
-    task.error = loadError;
-    task.state = 'completed';
   }
 }
 </script>
@@ -98,15 +89,15 @@ async function loadImages() {
           class="w-full p-2 outline-none text-sm bg-[var(--pd-select-bg)] rounded-sm text-[var(--pd-content-card-text)]"
           name="providerChoice"
           id="providerChoice"
-          bind:value="{selectedProvider}">
+          bind:value={selectedProvider}>
           {#each providerConnections as providerConnection}
-            <option value="{providerConnection}">{providerConnection.name}</option>
+            <option value={providerConnection}>{providerConnection.name}</option>
           {/each}
         </select>
       </label>
     {/if}
 
-    <Button on:click="{addArchivesToLoad}" icon="{faPlusCircle}" type="link">Add archive</Button>
+    <Button on:click={addArchivesToLoad} icon={faPlusCircle} type="link">Add archive</Button>
     <!-- Display the list of existing imagesToLoad -->
     {#if archivesToLoad.length > 0}
       <div class="flex flex-row justify-center w-full py-1 text-sm font-medium text-[var(--pd-content-card-text)]">
@@ -115,24 +106,24 @@ async function loadImages() {
     {/if}
     {#each archivesToLoad as archiveToLoad, index}
       <div class="flex flex-row justify-center w-full py-1">
-        <Input bind:value="{archiveToLoad}" aria-label="archive path" readonly="{true}" />
-        <Button type="link" on:click="{() => deleteImagesTarArchiveToLoad(index)}" icon="{faMinusCircle}" />
+        <Input bind:value={archiveToLoad} aria-label="archive path" readonly={true} />
+        <Button type="link" on:click={() => deleteImagesTarArchiveToLoad(index)} icon={faMinusCircle} />
       </div>
     {/each}
 
     <div class="pt-5">
       <Button
-        on:click="{() => loadImages()}"
-        inProgress="{inProgress}"
+        on:click={() => loadImages()}
+        inProgress={inProgress}
         class="w-full"
-        icon="{faPlay}"
+        icon={faPlay}
         aria-label="Load images"
-        bind:disabled="{loadDisabled}">
+        bind:disabled={loadDisabled}>
         Load Images
       </Button>
       <div aria-label="loadError">
         {#if loadError !== ''}
-          <ErrorMessage class="py-2 text-sm" error="{loadError}" />
+          <ErrorMessage class="py-2 text-sm" error={loadError} />
         {/if}
       </div>
     </div>

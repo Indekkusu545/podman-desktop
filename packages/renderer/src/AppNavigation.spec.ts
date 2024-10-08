@@ -29,6 +29,7 @@ import type { ContributionInfo } from '/@api/contribution-info';
 
 import AppNavigation from './AppNavigation.svelte';
 import { contributions } from './stores/contribs';
+import { fetchNavigationRegistries } from './stores/navigation/navigation-registry';
 
 const eventsMock = vi.fn();
 
@@ -39,9 +40,11 @@ vi.mock('/@/stores/kubernetes-contexts-state', async () => {
 // fake the window object
 beforeAll(() => {
   (window as any).events = eventsMock;
+  (window as any).getConfigurationValue = vi.fn();
+  (window as any).sendNavigationItems = vi.fn();
 });
 
-test('Test rendering of the navigation bar with empty items', () => {
+test('Test rendering of the navigation bar with empty items', async () => {
   const meta = {
     url: '/',
   } as unknown as TinroRouteMeta;
@@ -52,7 +55,12 @@ test('Test rendering of the navigation bar with empty items', () => {
   vi.mocked(kubeContextStore).kubernetesCurrentContextIngresses = readable<KubernetesObject[]>([]);
   vi.mocked(kubeContextStore).kubernetesCurrentContextRoutes = readable<KubernetesObject[]>([]);
   vi.mocked(kubeContextStore).kubernetesCurrentContextNodes = readable<KubernetesObject[]>([]);
+  vi.mocked(kubeContextStore).kubernetesCurrentContextConfigMaps = readable<KubernetesObject[]>([]);
+  vi.mocked(kubeContextStore).kubernetesCurrentContextSecrets = readable<KubernetesObject[]>([]);
   vi.mocked(kubeContextStore).kubernetesCurrentContextPersistentVolumeClaims = readable<KubernetesObject[]>([]);
+
+  // init navigation registry
+  await fetchNavigationRegistries();
 
   render(AppNavigation, {
     meta,
@@ -75,10 +83,8 @@ test('Test rendering of the navigation bar with empty items', () => {
   const settings = screen.getByRole('link', { name: 'Settings' });
   expect(settings).toBeInTheDocument();
 
-  const deployments = screen.queryByRole('link', { name: 'Deployments' });
-  expect(deployments).not.toBeInTheDocument();
-  const services = screen.queryByRole('link', { name: 'Services' });
-  expect(services).not.toBeInTheDocument();
+  const kubernetes = screen.queryByRole('link', { name: 'Kubernetes' });
+  expect(kubernetes).toBeInTheDocument();
 });
 
 test('Test contributions', () => {

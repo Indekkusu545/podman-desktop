@@ -47,23 +47,32 @@ async function editConnection(
   params: { [key: string]: any },
   key: symbol,
   keyLogger: (key: symbol, eventName: 'log' | 'warn' | 'error' | 'finish', args: string[]) => void,
-  tokenId?: number,
+  tokenId: number | undefined,
+  taskId: number | undefined,
 ): Promise<void> {
-  await window.editProviderConnectionLifecycle(internalProviderId, connectionInfo, params, key, keyLogger, tokenId);
+  await window.editProviderConnectionLifecycle(
+    internalProviderId,
+    connectionInfo,
+    params,
+    key,
+    keyLogger,
+    tokenId,
+    taskId,
+  );
 }
 </script>
 
 {#if providerInfo && connectionInfo}
-  <DetailsPage title="{connectionInfo.name}">
+  <DetailsPage title={connectionInfo.name}>
     <div slot="content" class="text-[var(--pd-content-text)]">
       <PreferencesConnectionCreationRendering
-        providerInfo="{providerInfo}"
-        connectionInfo="{connectionInfo}"
-        properties="{properties}"
-        propertyScope="{scope}"
-        callback="{editConnection}" />
+        providerInfo={providerInfo}
+        connectionInfo={connectionInfo}
+        properties={properties}
+        propertyScope={scope}
+        callback={editConnection} />
     </div>
-    <IconImage slot="icon" image="{providerInfo?.images?.icon}" alt="{providerInfo?.name}" class="max-h-10" />
+    <IconImage slot="icon" image={providerInfo?.images?.icon} alt={providerInfo?.name} class="max-h-10" />
     <svelte:fragment slot="subtitle">
       {#if connectionInfo.status === 'started'}
         <WarningMessage

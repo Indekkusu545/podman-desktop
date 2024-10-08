@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (C) 2023 Red Hat, Inc.
+ * Copyright (C) 2023-2024 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,8 +32,12 @@ class ResizeObserver {
   disconnect = vi.fn();
   unobserve = vi.fn();
 }
+
+const configMock = vi.fn();
+
 beforeAll(() => {
   (window as any).ResizeObserver = ResizeObserver;
+  (window as any).getConfigurationValue = configMock;
 });
 
 afterEach(() => {
@@ -118,7 +122,7 @@ const testProvidersInfoWithoutSessionRequests = [
 test('Expect Sign in button to be hidden when there are no session requests', async () => {
   authenticationProviders.set(testProvidersInfoWithoutSessionRequests);
   render(PreferencesAuthenticationProvidersRendering, {});
-  const menuButton = screen.queryAllByRole('button');
+  const menuButton = screen.queryAllByRole('button', { name: 'Sign in' });
   expect(menuButton.length).equals(0); // no menu button
 });
 
@@ -144,7 +148,7 @@ test('Expect Sign In button to be visible when there is only one session request
   const requestSignInMock = vi.fn();
   (window as any).requestAuthenticationProviderSignIn = requestSignInMock;
   render(PreferencesAuthenticationProvidersRendering, {});
-  const menuButton = screen.getByRole('button');
+  const menuButton = screen.getByRole('button', { name: 'Sign in' });
   const tooltip = screen.getByText('Sign in to use Extension Label');
   expect(tooltip).toBeInTheDocument();
   await fireEvent.click(menuButton);
@@ -179,7 +183,7 @@ test('Expect Sign In popup menu to be visible when there is more than one sessio
   authenticationProviders.set(testProvidersInfoWithMultipleSessionRequests);
   (window as any).requestAuthenticationProviderSignIn = vi.fn();
   render(PreferencesAuthenticationProvidersRendering, {});
-  const menuButton = screen.getByRole('button');
+  const menuButton = screen.getByRole('button', { name: 'kebab menu' });
   await fireEvent.click(menuButton);
   // test sign in with extension1
   const menuItem1 = screen.getByText('Sign in to use Extension1 Label');
@@ -203,7 +207,7 @@ test('Expects default icon to be used when provider has no images option', async
   });
 });
 
-test('Expects images.icon option to be used when no themes are present', () => {
+test('Expects images.icon option to be used when no themes are present', async () => {
   const providerWithImageIcon = [
     {
       id: 'test',
@@ -217,10 +221,16 @@ test('Expects images.icon option to be used when no themes are present', () => {
   ];
   authenticationProviders.set(providerWithImageIcon);
   render(PreferencesAuthenticationProvidersRendering, {});
-  screen.getByRole('img', { name: `Icon for ${testProvidersInfoWithSessionRequests[0].displayName} provider` });
+
+  // wait for image to be loaded
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  const icon = screen.getByRole('img', { name: `${testProvidersInfoWithSessionRequests[0].displayName}` });
+  expect(icon).toBeInTheDocument();
+  expect(icon).toHaveAttribute('src', './icon.png');
 });
 
-test('Expects images.icon.dark option to be used when themes are present', () => {
+test('Expects images.icon.dark option to be used when theme is dark', async () => {
   const providerWithImageIcon = [
     {
       id: 'test',
@@ -228,16 +238,22 @@ test('Expects images.icon.dark option to be used when themes are present', () =>
       accounts: [],
       images: {
         icon: {
-          dark: './icon.png',
-          light: './icon.png',
+          dark: './icon-dark.png',
+          light: './icon-light.png',
         },
       },
       sessionRequests: [],
     },
   ];
   authenticationProviders.set(providerWithImageIcon);
+
+  configMock.mockReturnValue('dark');
   render(PreferencesAuthenticationProvidersRendering, {});
-  screen.getByRole('img', {
-    name: `Dark color theme icon for ${testProvidersInfoWithSessionRequests[0].displayName} provider`,
-  });
+
+  // wait for image to be loaded
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  const icon = screen.getByRole('img', { name: `${testProvidersInfoWithSessionRequests[0].displayName}` });
+  expect(icon).toBeInTheDocument();
+  expect(icon).toHaveAttribute('src', './icon-dark.png');
 });

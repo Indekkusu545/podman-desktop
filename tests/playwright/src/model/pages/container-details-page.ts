@@ -21,17 +21,15 @@ import { expect as playExpect } from '@playwright/test';
 
 import { handleConfirmationDialog } from '../../utility/operations';
 import { ContainerState } from '../core/states';
-import { BasePage } from './base-page';
 import { ContainersPage } from './containers-page';
+import { DeployToKubernetesPage } from './deploy-to-kubernetes-page';
+import { DetailsPage } from './details-page';
 
-export class ContainerDetailsPage extends BasePage {
-  readonly labelName: Locator;
-  readonly heading: Locator;
-  readonly closeLink: Locator;
-  readonly backToContainersLink: Locator;
-  readonly containerName: string;
+export class ContainerDetailsPage extends DetailsPage {
   readonly stopButton: Locator;
   readonly deleteButton: Locator;
+  readonly imageLink: Locator;
+  readonly deployButton: Locator;
 
   static readonly SUMMARY_TAB = 'Summary';
   static readonly LOGS_TAB = 'Logs';
@@ -40,39 +38,25 @@ export class ContainerDetailsPage extends BasePage {
   static readonly INSPECT_TAB = 'Inspect';
 
   constructor(page: Page, name: string) {
-    super(page);
-    this.containerName = name;
-    this.labelName = page.getByLabel('name').and(page.getByText('Container Details'));
-    this.heading = page.getByRole('heading', { name: this.containerName });
-    this.closeLink = page.getByRole('link', { name: 'Close Details' });
-    this.backToContainersLink = page.getByRole('link', { name: 'Go back to Containers' });
-    this.stopButton = this.page.getByRole('button').and(this.page.getByLabel('Stop Container'));
-    this.deleteButton = this.page.getByRole('button').and(this.page.getByLabel('Delete Container'));
-  }
-
-  async activateTab(tabName: string): Promise<void> {
-    const tabItem = this.page.getByRole('link', { name: tabName, exact: true });
-    await playExpect(tabItem).toBeVisible();
-    await tabItem.click();
-  }
-
-  async getStateLocator(): Promise<Locator> {
-    await this.activateTab(ContainerDetailsPage.SUMMARY_TAB);
-    const summaryTable = this.getPage().getByRole('table');
-    const stateRow = summaryTable.locator('tr:has-text("State")');
-    const stateCell = stateRow.getByRole('cell').nth(1);
-    await playExpect(stateCell).toBeVisible();
-    return stateCell;
+    super(page, name);
+    this.stopButton = this.controlActions.getByRole('button').and(this.page.getByLabel('Stop Container'));
+    this.deleteButton = this.controlActions.getByRole('button').and(this.page.getByLabel('Delete Container'));
+    this.imageLink = this.header.getByRole('link', { name: 'Image Details' });
+    this.deployButton = this.controlActions.getByRole('button', { name: 'Deploy to Kubernetes' });
   }
 
   async getState(): Promise<string> {
-    const stateCell = await this.getStateLocator();
-    return await stateCell.innerText();
+    const currentState = await this.header.getByRole('status').getAttribute('title');
+    for (const state of Object.values(ContainerState)) {
+      if (currentState === state) return state;
+    }
+
+    return ContainerState.Unknown;
   }
 
   async stopContainer(failIfStopped = false): Promise<void> {
     try {
-      await playExpect.poll(async () => await this.getState()).toBe(ContainerState.Running.toLowerCase());
+      await playExpect.poll(async () => await this.getState()).toBe(ContainerState.Running);
       await playExpect(this.stopButton).toBeEnabled();
       await this.stopButton.click();
     } catch (error) {
@@ -93,10 +77,16 @@ export class ContainerDetailsPage extends BasePage {
 
   async getContainerPort(): Promise<string> {
     await this.activateTab(ContainerDetailsPage.SUMMARY_TAB);
-    const summaryTable = this.getPage().getByRole('table');
+    const summaryTable = this.tabContent.getByRole('table');
     const portsRow = summaryTable.locator('tr:has-text("Ports")');
     const portsCell = portsRow.getByRole('cell').nth(1);
     await playExpect(portsCell).toBeVisible();
     return await portsCell.innerText();
+  }
+
+  async openDeployToKubernetesPage(): Promise<DeployToKubernetesPage> {
+    await playExpect(this.deployButton).toBeVisible();
+    await this.deployButton.click();
+    return new DeployToKubernetesPage(this.page);
   }
 }

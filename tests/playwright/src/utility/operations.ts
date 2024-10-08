@@ -16,13 +16,22 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
+import { execSync } from 'node:child_process';
+
 import type { Page } from '@playwright/test';
 import { expect as playExpect } from '@playwright/test';
 
+import { ResourceElementActions } from '../model/core/operations';
+import { ResourceElementState } from '../model/core/states';
+import type { KindClusterOptions } from '../model/core/types';
+import { CLIToolsPage } from '../model/pages/cli-tools-page';
+import { CreateKindClusterPage } from '../model/pages/create-kind-cluster-page';
 import { RegistriesPage } from '../model/pages/registries-page';
+import { ResourceConnectionCardPage } from '../model/pages/resource-connection-card-page';
 import { ResourcesPage } from '../model/pages/resources-page';
-import { ResourcesPodmanConnections } from '../model/pages/resources-podman-connections-page';
+import { VolumeDetailsPage } from '../model/pages/volume-details-page';
 import { NavigationBar } from '../model/workbench/navigation';
+import { StatusBar } from '../model/workbench/status-bar';
 import { waitUntil, waitWhile } from './wait';
 
 /**
@@ -49,7 +58,7 @@ export async function deleteContainer(page: Page, name: string): Promise<void> {
     // wait for container to disappear
     try {
       console.log('Waiting for container to get deleted ...');
-      await playExpect.poll(async () => await containers.getContainerRowByName(name), { timeout: 10000 }).toBeFalsy();
+      await playExpect.poll(async () => await containers.getContainerRowByName(name), { timeout: 30000 }).toBeFalsy();
     } catch (error) {
       if (!(error as Error).message.includes('Page is empty')) {
         throw Error(`Error waiting for container '${name}' to get removed, ${error}`);
@@ -147,11 +156,16 @@ export async function handleConfirmationDialog(
   page: Page,
   dialogTitle = 'Confirmation',
   confirm = true,
+  confirmationButton = 'Yes',
+  cancelButton = 'Cancel',
 ): Promise<void> {
   // wait for dialog to appear using waitFor
   const dialog = page.getByRole('dialog', { name: dialogTitle, exact: true });
-  await dialog.waitFor({ state: 'visible', timeout: 3000 });
-  const button = confirm ? dialog.getByRole('button', { name: 'Yes' }) : dialog.getByRole('button', { name: 'Cancel' });
+  await playExpect(dialog).toBeVisible();
+  const button = confirm
+    ? dialog.getByRole('button', { name: confirmationButton })
+    : dialog.getByRole('button', { name: cancelButton });
+  await playExpect(button).toBeEnabled();
   await button.click();
 }
 
@@ -161,33 +175,154 @@ export async function handleConfirmationDialog(
  * @param machineVisibleName Name of the Podman Machine to delete
  */
 export async function deletePodmanMachine(page: Page, machineVisibleName: string): Promise<void> {
+  const RESOURCE_NAME: string = 'podman';
   const navigationBar = new NavigationBar(page);
   const dashboardPage = await navigationBar.openDashboard();
-  await playExpect(dashboardPage.mainPage).toBeVisible({ timeout: 3000 });
+  await playExpect(dashboardPage.heading).toBeVisible();
   const settingsBar = await navigationBar.openSettings();
   const resourcesPage = await settingsBar.openTabPage(ResourcesPage);
-  await playExpect(resourcesPage.podmanResources).toBeVisible({ timeout: 10_000 });
-  const resourcesPodmanConnections = new ResourcesPodmanConnections(page, machineVisibleName);
-  await playExpect(resourcesPodmanConnections.providerConnections).toBeVisible({ timeout: 10_000 });
+  await playExpect
+    .poll(async () => await resourcesPage.resourceCardIsVisible(RESOURCE_NAME), { timeout: 10000 })
+    .toBeTruthy();
+  const podmanResourceCard = new ResourceConnectionCardPage(page, RESOURCE_NAME, machineVisibleName);
+  await playExpect(podmanResourceCard.providerConnections).toBeVisible({ timeout: 10_000 });
   await waitUntil(
     async () => {
-      return await resourcesPodmanConnections.podmanMachineElement.isVisible();
+      return await podmanResourceCard.resourceElement.isVisible();
     },
     { timeout: 15000 },
   );
-  if (await resourcesPodmanConnections.podmanMachineElement.isVisible()) {
-    await playExpect(resourcesPodmanConnections.machineConnectionActions).toBeVisible({ timeout: 3000 });
-    await playExpect(resourcesPodmanConnections.machineConnectionStatus).toBeVisible({ timeout: 3000 });
-    if ((await resourcesPodmanConnections.machineConnectionStatus.innerText()) === 'RUNNING') {
-      await playExpect(resourcesPodmanConnections.machineStopButton).toBeVisible({ timeout: 3000 });
-      await resourcesPodmanConnections.machineStopButton.click();
-      await playExpect(resourcesPodmanConnections.machineConnectionStatus).toHaveText('OFF', { timeout: 30_000 });
+  if (await podmanResourceCard.resourceElement.isVisible()) {
+    await playExpect(podmanResourceCard.resourceElementConnectionActions).toBeVisible({ timeout: 3000 });
+    await playExpect(podmanResourceCard.resourceElementConnectionStatus).toBeVisible({ timeout: 3000 });
+    if ((await podmanResourceCard.resourceElementConnectionStatus.innerText()) === ResourceElementState.Starting) {
+      console.log('Podman machine is in starting currently, will send stop command via CLI');
+      // eslint-disable-next-line sonarjs/os-command
+      execSync(`podman machine stop ${machineVisibleName}`);
+      await playExpect(podmanResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Off, {
+        timeout: 30_000,
+      });
+      console.log('Podman machine stopped via CLI');
     }
-    await playExpect(resourcesPodmanConnections.machineDeleteButton).toBeVisible({ timeout: 3000 });
-    await waitWhile(() => resourcesPodmanConnections.machineDeleteButton.isDisabled(), { timeout: 10000 });
-    await resourcesPodmanConnections.machineDeleteButton.click();
-    await playExpect(resourcesPodmanConnections.podmanMachineElement).toBeHidden({ timeout: 30_000 });
+    if ((await podmanResourceCard.resourceElementConnectionStatus.innerText()) === ResourceElementState.Running) {
+      await podmanResourceCard.performConnectionAction(ResourceElementActions.Stop);
+      await playExpect(podmanResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Off, {
+        timeout: 30_000,
+      });
+    }
+    await podmanResourceCard.performConnectionAction(ResourceElementActions.Delete);
+    await playExpect(podmanResourceCard.resourceElement).toBeHidden({ timeout: 30_000 });
   } else {
     console.log(`Podman machine [${machineVisibleName}] not present, skipping deletion.`);
   }
+}
+
+export async function getVolumeNameForContainer(page: Page, containerName: string): Promise<string | undefined> {
+  try {
+    const navigationBar = new NavigationBar(page);
+    const volumePage = await navigationBar.openVolumes();
+    const rows = await volumePage.getAllTableRows();
+    for (let i = rows.length - 1; i > 0; i--) {
+      const volumeName = await rows[i].getByRole('cell').nth(3).getByRole('button').textContent();
+      if (volumeName) {
+        const volumeDetails = await volumePage.openVolumeDetails(volumeName);
+        await volumeDetails.activateTab(VolumeDetailsPage.SUMMARY_TAB);
+        const volumeSummaryContent = await volumeDetails.tabContent.allTextContents();
+        for (const content of volumeSummaryContent) {
+          if (content.includes(containerName)) {
+            await volumeDetails.backLink.click();
+            return volumeName;
+          }
+        }
+        await volumeDetails.backLink.click();
+      }
+    }
+    return undefined;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === 'Page is empty, there is no content' || error.message.includes('does not exist'))
+    ) {
+      return undefined;
+    } else {
+      throw error;
+    }
+  }
+}
+
+export async function ensureKindCliInstalled(page: Page, timeout = 60000): Promise<void> {
+  const cliToolsPage = new CLIToolsPage(page);
+  await playExpect(cliToolsPage.toolsTable).toBeVisible({ timeout: 10000 });
+  await playExpect.poll(async () => await cliToolsPage.toolsTable.count()).toBeGreaterThan(0);
+  await playExpect(cliToolsPage.getToolRow('Kind')).toBeVisible();
+
+  if (!(await cliToolsPage.getCurrentToolVersion('Kind'))) {
+    await cliToolsPage.installTool('Kind');
+  }
+
+  await playExpect
+    .poll(async () => await cliToolsPage.getCurrentToolVersion('Kind'), { timeout: timeout })
+    .toBeTruthy();
+}
+
+export async function createKindCluster(
+  page: Page,
+  clusterName: string,
+  usedefaultOptions: boolean,
+  timeout: number = 200000,
+  { providerType, httpPort, httpsPort, useIngressController, containerImage }: KindClusterOptions = {},
+): Promise<void> {
+  const navigationBar = new NavigationBar(page);
+  const statusBar = new StatusBar(page);
+  const kindResourceCard = new ResourceConnectionCardPage(page, 'kind');
+  const createKindClusterPage = new CreateKindClusterPage(page);
+
+  const settingsPage = await navigationBar.openSettings();
+  const resourcesPage = await settingsPage.openTabPage(ResourcesPage);
+  await playExpect.poll(async () => resourcesPage.resourceCardIsVisible('kind')).toBeTruthy();
+  await playExpect(kindResourceCard.markdownContent).toBeVisible();
+  await playExpect(kindResourceCard.createButton).toBeVisible();
+  await kindResourceCard.createButton.click();
+  if (usedefaultOptions) {
+    await createKindClusterPage.createClusterDefault(clusterName, timeout);
+  } else {
+    await createKindClusterPage.createClusterParametrized(
+      clusterName,
+      {
+        providerType: providerType,
+        httpPort: httpPort,
+        httpsPort: httpsPort,
+        useIngressController: useIngressController,
+        containerImage: containerImage,
+      },
+      timeout,
+    );
+  }
+  await playExpect(kindResourceCard.resourceElement).toBeVisible();
+  await playExpect(kindResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Running, {
+    timeout: 15000,
+  });
+  await statusBar.validateKubernetesContext(`kind-${clusterName}`);
+}
+
+export async function deleteKindCluster(
+  page: Page,
+  containerName: string = 'kind-cluster-control-plane',
+): Promise<void> {
+  const navigationBar = new NavigationBar(page);
+  const kindResourceCard = new ResourceConnectionCardPage(page, 'kind');
+
+  await navigationBar.openSettings();
+  await kindResourceCard.performConnectionAction(ResourceElementActions.Stop);
+  await playExpect(kindResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Off, {
+    timeout: 50000,
+  });
+  await kindResourceCard.performConnectionAction(ResourceElementActions.Delete);
+  await playExpect(kindResourceCard.markdownContent).toBeVisible({ timeout: 50000 });
+  const containersPage = await navigationBar.openContainers();
+  await playExpect.poll(async () => containersPage.containerExists(containerName), { timeout: 10000 }).toBeFalsy();
+
+  await playExpect
+    .poll(async () => await getVolumeNameForContainer(page, containerName), { timeout: 20000 })
+    .toBeFalsy();
 }

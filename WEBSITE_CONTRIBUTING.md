@@ -12,14 +12,14 @@ The website is built using [docusaurus](https://docusaurus.io/) and published to
 
 ### Tips
 
-* When referring to a clickable button in the interface, **bold** the name. For example: Click on the **Extensions** button.
+- When referring to a clickable button in the interface, **bold** the name. For example: Click on the **Extensions** button.
 
 ## Previewing the website
 
 The website can be previewed by running the following command:
 
 ```sh
-yarn website:dev
+pnpm website:dev
 ```
 
 Which will automatically open your browser to `localhost:3000`.
@@ -27,7 +27,7 @@ Which will automatically open your browser to `localhost:3000`.
 You may also build a "production-like" environment by using:
 
 ```sh
-yarn website:prod
+pnpm website:prod
 ```
 
 ## Pull request previews
@@ -42,12 +42,12 @@ Formatting and lint checking can be examined by running the following commands:
 
 ```sh
 # Markdown formatting
-yarn format:check
-yarn format:fix
+pnpm format:check
+pnpm format:fix
 
 # Markdown lint checking
-yarn markdownlint:check
-yarn markdownlint:fix
+pnpm markdownlint:check
+pnpm markdownlint:fix
 ```
 
 ## Screenshot and video standards
@@ -167,12 +167,12 @@ A template for describing a new feature being added for `package.json`. For exam
 
 \`\`\`json
 {
-  "<key>": {
-    "<property>": "<value>",
-    "<additional settings>": {
-      "<setting>": "<setting value>"
-    }
-  }
+"<key>": {
+"<property>": "<value>",
+"<additional settings>": {
+"<setting>": "<setting value>"
+}
+}
 }
 \`\`\`
 
@@ -186,7 +186,7 @@ A template for describing a new feature being added for `package.json`. For exam
 
 \`\`\`json
 {
-  "<key>": "<example configuration>"
+"<key>": "<example configuration>"
 }
 \`\`\`
 

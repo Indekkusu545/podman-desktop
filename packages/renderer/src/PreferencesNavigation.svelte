@@ -41,33 +41,36 @@ onMount(async () => {
 </script>
 
 <nav
-  class="z-1 w-leftsidebar min-w-leftsidebar shadow flex-col justify-between flex transition-all duration-500 ease-in-out bg-[var(--pd-secondary-nav-bg)]"
+  class="z-1 w-leftsidebar min-w-leftsidebar flex-col justify-between flex transition-all duration-500 ease-in-out bg-[var(--pd-secondary-nav-bg)] border-[var(--pd-global-nav-bg-border)] border-r-[1px]"
   aria-label="PreferencesNavigation">
   <div class="flex items-center">
-    <div class="pt-4 px-5 mb-10">
-      <p class="text-xl first-letter:uppercase text-[color:var(--pd-secondary-nav-header-text)]">Settings</p>
+    <div class="pt-4 px-3 mb-10">
+      <p
+        class="text-2xl font-semibold text-[color:var(--pd-secondary-nav-header-text)] border-l-[4px] border-transparent">
+        Settings
+      </p>
     </div>
   </div>
   <div class="h-full overflow-hidden hover:overflow-y-auto" style="margin-bottom:auto">
     {#each [{ title: 'Resources', href: '/preferences/resources' }, { title: 'Proxy', href: '/preferences/proxies' }, { title: 'Registries', href: '/preferences/registries' }, { title: 'Authentication', href: '/preferences/authentication-providers' }, { title: 'CLI Tools', href: '/preferences/cli-tools' }, { title: 'Kubernetes', href: '/preferences/kubernetes-contexts' }] as navItem}
-      <SettingsNavItem title="{navItem.title}" href="{navItem.href}" selected="{meta.url === navItem.href}" />
+      <SettingsNavItem title={navItem.title} href={navItem.href} selected={meta.url === navItem.href} />
     {/each}
 
     <!-- Default configuration properties start -->
     {#each Object.entries(configProperties) as [configSection, configItems]}
       <SettingsNavItem
-        title="{configSection}"
+        title={configSection}
         href="/preferences/default/{configSection}"
-        section="{configItems.length > 0}"
-        selected="{meta.url === `/preferences/default/${configSection}`}"
-        bind:expanded="{sectionExpanded[configSection]}" />
+        section={configItems.length > 0}
+        selected={meta.url === `/preferences/default/${configSection}`}
+        bind:expanded={sectionExpanded[configSection]} />
       {#if sectionExpanded[configSection]}
         {#each sortItems(configItems) as configItem}
           <SettingsNavItem
-            title="{configItem.title}"
+            title={configItem.title}
             href="/preferences/default/{configItem.id}"
-            child="{true}"
-            selected="{meta.url === `/preferences/default/${configItem.id}`}" />
+            child={true}
+            selected={meta.url === `/preferences/default/${configItem.id}`} />
         {/each}
       {/if}
     {/each}

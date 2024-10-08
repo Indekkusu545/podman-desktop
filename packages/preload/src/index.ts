@@ -34,6 +34,7 @@ import type {
   V1PersistentVolumeClaim,
   V1Pod,
   V1PodList,
+  V1Secret,
   V1Service,
 } from '@kubernetes/client-node';
 import type * as containerDesktopAPI from '@podman-desktop/api';
@@ -62,8 +63,9 @@ import type { ImageCheckerInfo } from '/@api/image-checker-info';
 import type { ImageFilesInfo } from '/@api/image-files-info';
 import type { ImageInfo } from '/@api/image-info';
 import type { ImageInspectInfo } from '/@api/image-inspect-info';
-import type { ImageSearchOptions, ImageSearchResult } from '/@api/image-registry';
-import type { ManifestCreateOptions, ManifestInspectInfo } from '/@api/manifest-info';
+import type { ImageSearchOptions, ImageSearchResult, ImageTagsListOptions } from '/@api/image-registry';
+import type { KubeContext } from '/@api/kubernetes-context';
+import type { ManifestCreateOptions, ManifestInspectInfo, ManifestPushOptions } from '/@api/manifest-info';
 import type { NetworkInspectInfo } from '/@api/network-info';
 import type { NotificationCard, NotificationCardOptions } from '/@api/notification';
 import type { OnboardingInfo, OnboardingStatus } from '/@api/onboarding';
@@ -96,9 +98,8 @@ import type {
   GenerateKubeResult,
   KubernetesGeneratorArgument,
   KubernetesGeneratorSelector,
-} from '../../main/src/plugin/kube-generator-registry';
-import type { KubeContext } from '../../main/src/plugin/kubernetes-context';
-import type { ContextGeneralState, ResourceName } from '../../main/src/plugin/kubernetes-context-state.js';
+} from '../../main/src/plugin/kubernetes/kube-generator-registry';
+import type { ContextGeneralState, ResourceName } from '../../main/src/plugin/kubernetes/kubernetes-context-state';
 import type { Guide } from '../../main/src/plugin/learning-center/learning-center-api';
 import type { Menu } from '../../main/src/plugin/menu-registry';
 import type { MessageBoxOptions, MessageBoxReturnValue } from '../../main/src/plugin/message-box';
@@ -211,6 +212,18 @@ export function initExposure(): void {
     apiSender.send('install-extension:from-id', extensionId);
   });
 
+  contextBridge.exposeInMainWorld('clearTasks', async (): Promise<void> => {
+    return ipcInvoke('tasks:clear-all');
+  });
+
+  contextBridge.exposeInMainWorld('clearTask', async (taskId: string): Promise<void> => {
+    return ipcInvoke('tasks:clear', taskId);
+  });
+
+  contextBridge.exposeInMainWorld('executeTask', async (taskId: string): Promise<void> => {
+    return ipcInvoke('tasks:execute', taskId);
+  });
+
   contextBridge.exposeInMainWorld('extensionSystemIsReady', async (): Promise<boolean> => {
     return ipcInvoke('extension-system:isReady');
   });
@@ -223,6 +236,13 @@ export function initExposure(): void {
     'getDevtoolsConsoleLogs',
     async (): Promise<{ logType: LogType; date: Date; message: string }[]> => {
       return memoryLogs;
+    },
+  );
+
+  contextBridge.exposeInMainWorld(
+    'sendNavigationItems',
+    async (items: { name: string; visible: boolean }[]): Promise<void> => {
+      return ipcRenderer.invoke('navigation:sendNavigationItems', items);
     },
   );
 
@@ -302,6 +322,12 @@ export function initExposure(): void {
       return ipcInvoke('container-provider-registry:inspectManifest', engine, manifestId);
     },
   );
+  contextBridge.exposeInMainWorld('pushManifest', async (pushOptions: ManifestPushOptions): Promise<void> => {
+    return ipcInvoke('container-provider-registry:pushManifest', pushOptions);
+  });
+  contextBridge.exposeInMainWorld('removeManifest', async (engine: string, manifestId: string): Promise<void> => {
+    return ipcInvoke('container-provider-registry:removeManifest', engine, manifestId);
+  });
 
   /**
    * @deprecated This method is deprecated and will be removed in a future release.
@@ -828,7 +854,8 @@ export function initExposure(): void {
       params: { [key: string]: any },
       key: symbol,
       keyLogger: (key: symbol, eventName: 'log' | 'warn' | 'error' | 'finish', args: string[]) => void,
-      tokenId?: number,
+      tokenId: number | undefined,
+      taskId: number | undefined,
     ): Promise<void> => {
       onDataCallbacksTaskConnectionId++;
       onDataCallbacksTaskConnectionKeys.set(onDataCallbacksTaskConnectionId, key);
@@ -839,6 +866,7 @@ export function initExposure(): void {
         params,
         onDataCallbacksTaskConnectionId,
         tokenId,
+        taskId,
       );
     },
   );
@@ -861,7 +889,8 @@ export function initExposure(): void {
       params: { [key: string]: any },
       key: symbol,
       keyLogger: (key: symbol, eventName: 'log' | 'warn' | 'error' | 'finish', args: string[]) => void,
-      tokenId?: number,
+      tokenId: number | undefined,
+      taskId: number | undefined,
     ): Promise<void> => {
       onDataCallbacksTaskConnectionId++;
       onDataCallbacksTaskConnectionKeys.set(onDataCallbacksTaskConnectionId, key);
@@ -872,6 +901,7 @@ export function initExposure(): void {
         params,
         onDataCallbacksTaskConnectionId,
         tokenId,
+        taskId,
       );
     },
   );
@@ -959,6 +989,26 @@ export function initExposure(): void {
     },
   );
 
+  ipcRenderer.on(
+    'provider-registry:installCliTool-onData',
+    (_, onDataCallbacksTaskConnectionId: number, channel: string, data: string[]) => {
+      // grab callback from the map
+      const callback = onDataCallbacksTaskConnectionLogs.get(onDataCallbacksTaskConnectionId);
+      const key = onDataCallbacksTaskConnectionKeys.get(onDataCallbacksTaskConnectionId);
+      if (callback && key) {
+        if (channel === 'log') {
+          callback(key, 'log', data);
+        } else if (channel === 'warn') {
+          callback(key, 'warn', data);
+        } else if (channel === 'error') {
+          callback(key, 'error', data);
+        } else if (channel === 'finish') {
+          callback(key, 'finish', data);
+        }
+      }
+    },
+  );
+
   contextBridge.exposeInMainWorld(
     'startProviderConnectionLifecycle',
     async (
@@ -1008,7 +1058,8 @@ export function initExposure(): void {
       params: { [key: string]: any },
       key: symbol,
       keyLogger: (key: symbol, eventName: 'log' | 'warn' | 'error' | 'finish', args: string[]) => void,
-      tokenId?: number,
+      tokenId: number | undefined,
+      taskId: number | undefined,
     ): Promise<void> => {
       onDataCallbacksTaskConnectionId++;
       onDataCallbacksTaskConnectionKeys.set(onDataCallbacksTaskConnectionId, key);
@@ -1020,6 +1071,7 @@ export function initExposure(): void {
         params,
         onDataCallbacksTaskConnectionId,
         tokenId,
+        taskId,
       );
     },
   );
@@ -1112,8 +1164,46 @@ export function initExposure(): void {
     return ipcInvoke('cli-tool-registry:getCliToolInfos');
   });
 
+  contextBridge.exposeInMainWorld('selectCliToolVersionToUpdate', async (id: string): Promise<string> => {
+    return ipcInvoke('cli-tool-registry:selectCliToolVersionToUpdate', id);
+  });
+
   contextBridge.exposeInMainWorld(
     'updateCliTool',
+    async (
+      id: string,
+      key: symbol,
+      version: string,
+      keyLogger: (key: symbol, eventName: 'log' | 'warn' | 'error' | 'finish', args: string[]) => void,
+    ): Promise<void> => {
+      onDataCallbacksTaskConnectionId++;
+      onDataCallbacksTaskConnectionKeys.set(onDataCallbacksTaskConnectionId, key);
+      onDataCallbacksTaskConnectionLogs.set(onDataCallbacksTaskConnectionId, keyLogger);
+      return ipcInvoke('cli-tool-registry:updateCliTool', id, version, onDataCallbacksTaskConnectionId);
+    },
+  );
+
+  contextBridge.exposeInMainWorld('selectCliToolVersionToInstall', async (id: string): Promise<string> => {
+    return ipcInvoke('cli-tool-registry:selectCliToolVersionToInstall', id);
+  });
+
+  contextBridge.exposeInMainWorld(
+    'installCliTool',
+    async (
+      id: string,
+      versionToInstall: string,
+      key: symbol,
+      keyLogger: (key: symbol, eventName: 'log' | 'warn' | 'error' | 'finish', args: string[]) => void,
+    ): Promise<void> => {
+      onDataCallbacksTaskConnectionId++;
+      onDataCallbacksTaskConnectionKeys.set(onDataCallbacksTaskConnectionId, key);
+      onDataCallbacksTaskConnectionLogs.set(onDataCallbacksTaskConnectionId, keyLogger);
+      return ipcInvoke('cli-tool-registry:installCliTool', id, versionToInstall, onDataCallbacksTaskConnectionId);
+    },
+  );
+
+  contextBridge.exposeInMainWorld(
+    'uninstallCliTool',
     async (
       id: string,
       key: symbol,
@@ -1122,7 +1212,7 @@ export function initExposure(): void {
       onDataCallbacksTaskConnectionId++;
       onDataCallbacksTaskConnectionKeys.set(onDataCallbacksTaskConnectionId, key);
       onDataCallbacksTaskConnectionLogs.set(onDataCallbacksTaskConnectionId, keyLogger);
-      return ipcInvoke('cli-tool-registry:updateCliTool', id, onDataCallbacksTaskConnectionId);
+      return ipcInvoke('cli-tool-registry:uninstallCliTool', id, onDataCallbacksTaskConnectionId);
     },
   );
 
@@ -1238,6 +1328,13 @@ export function initExposure(): void {
   );
 
   contextBridge.exposeInMainWorld(
+    'listImageTagsInRegistry',
+    async (options: ImageTagsListOptions): Promise<string[]> => {
+      return ipcInvoke('image-registry:listImageTags', options);
+    },
+  );
+
+  contextBridge.exposeInMainWorld(
     'getAuthenticationProvidersInfo',
     async (): Promise<readonly AuthenticationProviderInfo[]> => {
       return ipcInvoke('authentication-provider-registry:getAuthenticationProvidersInfo');
@@ -1303,6 +1400,10 @@ export function initExposure(): void {
     return ipcInvoke('catalog:getExtensions');
   });
 
+  contextBridge.exposeInMainWorld('refreshCatalogExtensions', async (): Promise<void> => {
+    return ipcInvoke('catalog:refreshExtensions');
+  });
+
   contextBridge.exposeInMainWorld('getCommandPaletteCommands', async (): Promise<CommandInfo[]> => {
     return ipcInvoke('commands:getCommandPaletteCommands');
   });
@@ -1353,6 +1454,10 @@ export function initExposure(): void {
   // by delegating to the renderer process
   ipcRenderer.on('dev-tools:open-webview', (_, webviewId: string) => {
     apiSender.send('dev-tools:open-webview', webviewId);
+  });
+
+  ipcRenderer.on('context-menu:visible', (_, visible: boolean) => {
+    apiSender.send('context-menu:visible', visible);
   });
 
   // Handle callback on dialogs by calling the callback once we get the answer
@@ -1724,6 +1829,12 @@ export function initExposure(): void {
       return ipcInvoke('kubernetes-client:readNamespacedConfigMap', name, namespace);
     },
   );
+  contextBridge.exposeInMainWorld(
+    'kubernetesReadNamespacedSecret',
+    async (name: string, namespace: string): Promise<V1Secret | undefined> => {
+      return ipcInvoke('kubernetes-client:readNamespacedSecret', name, namespace);
+    },
+  );
 
   contextBridge.exposeInMainWorld('kubernetesIsAPIGroupSupported', async (group: string): Promise<boolean> => {
     return ipcInvoke('kubernetes-client:isAPIGroupSupported', group);
@@ -1793,6 +1904,14 @@ export function initExposure(): void {
 
   contextBridge.exposeInMainWorld('kubernetesDeleteDeployment', async (name: string): Promise<void> => {
     return ipcInvoke('kubernetes-client:deleteDeployment', name);
+  });
+
+  contextBridge.exposeInMainWorld('kubernetesDeleteConfigMap', async (name: string): Promise<void> => {
+    return ipcInvoke('kubernetes-client:deleteConfigMap', name);
+  });
+
+  contextBridge.exposeInMainWorld('kubernetesDeleteSecret', async (name: string): Promise<void> => {
+    return ipcInvoke('kubernetes-client:deleteSecret', name);
   });
 
   contextBridge.exposeInMainWorld('kubernetesDeletePersistentVolumeClaim', async (name: string): Promise<void> => {
@@ -1867,9 +1986,13 @@ export function initExposure(): void {
     }
   });
 
+  contextBridge.exposeInMainWorld('restartKubernetesPod', async (name: string): Promise<void> => {
+    return ipcInvoke('kubernetes-client:restartPod', name);
+  });
+
   contextBridge.exposeInMainWorld(
     'kubernetesApplyResourcesFromFile',
-    async (context: string, file: string, namespace?: string): Promise<KubernetesObject[]> => {
+    async (context: string, file: string | string[], namespace?: string): Promise<KubernetesObject[]> => {
       return ipcInvoke('kubernetes-client:applyResourcesFromFile', context, file, namespace);
     },
   );

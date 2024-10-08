@@ -1,6 +1,7 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 import { resolve } from 'node:path';
+import { createNotesFiles } from './release-notes-parser';
 import Storybook from './storybook';
 
 const lightCodeTheme = require('prism-react-renderer').themes.github;
@@ -24,6 +25,9 @@ const config = {
   trailingSlash: false,
   markdown: {
     mermaid: true,
+    parseFrontMatter: async params => {
+      return createNotesFiles(params);
+    },
   },
   themes: ['@docusaurus/theme-mermaid'],
   plugins: [
@@ -303,6 +307,14 @@ const config = {
       },
     ],
     [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'tutorial',
+        path: 'tutorial',
+        routeBasePath: 'tutorial',
+      },
+    ],
+    [
       'docusaurus-plugin-typedoc',
       {
         id: 'api',
@@ -318,12 +330,11 @@ const config = {
     // Custom Storybook integration
     [
       Storybook,
-      /** @type {import('./storybook').PluginOptions} */
-      ({
+      {
         id: 'storybook-docusaurus-integration',
         output: 'src/pages/storybook',
         storybookStatic: '../storybook/storybook-static',
-      }),
+      },
     ],
   ],
   presets: [
@@ -386,6 +397,7 @@ const config = {
           { to: '/downloads', label: 'Downloads', position: 'left' },
           { to: '/extend', label: 'Extend', position: 'left' },
           { to: '/blog', label: 'Blog', position: 'left' },
+          { to: '/tutorial', label: 'Tutorials', position: 'left' },
           {
             href: 'https://github.com/containers/podman-desktop',
             className: 'header-github-link',

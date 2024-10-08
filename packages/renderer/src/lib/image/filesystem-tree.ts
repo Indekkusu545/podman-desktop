@@ -61,11 +61,16 @@ export class FilesystemTree<T> {
 
   addPath(path: string, entry: T, size: number): FilesystemTree<T> {
     const currentSize = this.currentSize(path);
+    // If we add an already existing directory, we replace its size with its current one
+    // so we do not overwrite it (being the size of all its descendants)
+    if (currentSize && this.isDirectory(path)) {
+      size = currentSize;
+    }
     this.size += size - (currentSize ?? 0);
     const parts = path.split('/');
     let node = this.root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
+    for (const element of parts) {
+      const part = element;
       if (part === '') {
         continue;
       }
@@ -90,8 +95,8 @@ export class FilesystemTree<T> {
     this.size -= currentSize;
     const parts = path.split('/');
     let node = this.root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
+    for (const element of parts) {
+      const part = element;
       if (part === '') {
         continue;
       }
@@ -125,8 +130,8 @@ export class FilesystemTree<T> {
     this.size -= currentSize;
     const parts = path.split('/');
     let node = this.root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
+    for (const element of parts) {
+      const part = element;
       if (part === '') {
         continue;
       }
@@ -147,8 +152,8 @@ export class FilesystemTree<T> {
     this.size -= currentSize ?? 0;
     const parts = path.split('/');
     let node = this.root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
+    for (const element of parts) {
+      const part = element;
       if (part === '') {
         continue;
       }
@@ -168,8 +173,8 @@ export class FilesystemTree<T> {
   currentSize(path: string): number | undefined {
     const parts = path.split('/');
     let node = this.root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
+    for (const element of parts) {
+      const part = element;
       if (part === '') {
         continue;
       }
@@ -181,6 +186,24 @@ export class FilesystemTree<T> {
       }
     }
     return node.size;
+  }
+
+  isDirectory(path: string): boolean {
+    const parts = path.split('/');
+    let node = this.root;
+    for (const element of parts) {
+      const part = element;
+      if (part === '') {
+        continue;
+      }
+      const next = node.children.get(part);
+      if (next) {
+        node = next;
+      } else {
+        return false;
+      }
+    }
+    return node.children.size > 0;
   }
 
   copy(): FilesystemTree<T> {

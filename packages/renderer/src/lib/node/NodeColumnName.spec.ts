@@ -40,7 +40,6 @@ test('Expect simple column styling', async () => {
 
   const text = screen.getByText(node.name);
   expect(text).toBeInTheDocument();
-  expect(text).toHaveClass('text-sm');
   expect(text).toHaveClass('text-[var(--pd-table-body-text-highlight)]');
 });
 
@@ -55,5 +54,5 @@ test('Expect clicking works', async () => {
 
   fireEvent.click(text);
 
-  expect(routerGotoSpy).toBeCalledWith('/nodes/my-node/summary');
+  expect(routerGotoSpy).toBeCalledWith('/kubernetes/nodes/my-node/summary');
 });

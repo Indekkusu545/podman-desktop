@@ -28,11 +28,16 @@ import type { ImageInspectInfo } from '/@api/image-inspect-info';
 import type { ImageInfoUI } from './ImageInfoUI';
 import PushImageModal from './PushImageModal.svelte';
 
-vi.mock('xterm', () => {
+vi.mock('@xterm/xterm', () => {
   return {
-    Terminal: vi
-      .fn()
-      .mockReturnValue({ loadAddon: vi.fn(), open: vi.fn(), write: vi.fn(), clear: vi.fn(), reset: vi.fn() }),
+    Terminal: vi.fn().mockReturnValue({
+      loadAddon: vi.fn(),
+      open: vi.fn(),
+      write: vi.fn(),
+      clear: vi.fn(),
+      reset: vi.fn(),
+      dispose: vi.fn(),
+    }),
   };
 });
 

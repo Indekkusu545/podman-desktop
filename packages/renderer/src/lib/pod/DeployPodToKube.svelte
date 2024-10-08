@@ -363,8 +363,6 @@ async function deployToKube() {
   }
 }
 
-$: bodyPod && updateKubeResult();
-
 // Update bodyPod.metadata.labels.app to be the same as bodyPod.metadata.name
 // If statement required as bodyPod.metadata is undefined when bodyPod is undefined
 $: {
@@ -373,19 +371,21 @@ $: {
   }
 }
 
+$: bodyPod && updateKubeResult();
+
 function updateKubeResult() {
   kubeDetails = jsYaml.dump(bodyPod, { noArrayIndent: true, quotingType: '"', lineWidth: -1 });
 }
 </script>
 
-<EngineFormPage title="Deploy generated pod to Kubernetes" inProgress="{deployStarted && !deployFinished}">
+<EngineFormPage title="Deploy generated pod to Kubernetes" inProgress={deployStarted && !deployFinished}>
   <i class="fas fa-rocket fa-2x" slot="icon" aria-hidden="true"></i>
 
   <div slot="content" class="space-y-2">
     {#if kubeDetails}
       <p>Generated Kubernetes YAML:</p>
       <div class="h-48 pt-2">
-        <MonacoEditor content="{kubeDetails}" language="yaml" />
+        <MonacoEditor content={kubeDetails} language="yaml" />
       </div>
     {/if}
 
@@ -393,7 +393,13 @@ function updateKubeResult() {
       <div class="pt-2 pb-4">
         <label for="contextToUse" class="block mb-1 text-sm font-medium text-[var(--pd-content-card-header-text)]"
           >Pod Name:</label>
-        <Input bind:value="{bodyPod.metadata.name}" name="podName" id="podName" class="w-full" required />
+        <Input
+          bind:value={bodyPod.metadata.name}
+          name="podName"
+          aria-label="Pod Name"
+          id="podName"
+          class="w-full"
+          required />
       </div>
     {/if}
 
@@ -401,10 +407,11 @@ function updateKubeResult() {
       <label for="services" class="block mb-1 text-sm font-medium text-[var(--pd-content-card-header-text)]"
         >Kubernetes Services:</label>
       <Checkbox
-        bind:checked="{deployUsingServices}"
+        bind:checked={deployUsingServices}
         class="text-[var(--pd-content-card-text)] text-sm ml-1"
         name="useServices"
         id="useServices"
+        title="Use Services"
         required>
         Replace .hostPort exposure on containers by Services. It is the recommended way to expose ports, as a cluster
         policy may prevent to use hostPort.</Checkbox>
@@ -414,15 +421,15 @@ function updateKubeResult() {
       <label for="useRestricted" class="block mb-1 text-sm font-medium text-[var(--pd-content-card-header-text)]"
         >Restricted Security Context:</label>
       <Checkbox
-        bind:checked="{deployUsingRestrictedSecurityContext}"
+        bind:checked={deployUsingRestrictedSecurityContext}
         class="text-[var(--pd-content-card-text)] text-sm ml-1"
         name="useRestricted"
         id="useRestricted"
-        title="Use restricted security context"
+        title="Use Restricted Security Context"
         required>
         Update Kubernetes manifest to respect the Pod security <Link
-          on:click="{() =>
-            window.openExternal('https://kubernetes.io/docs/concepts/security/pod-security-standards#restricted')}"
+          on:click={() =>
+            window.openExternal('https://kubernetes.io/docs/concepts/security/pod-security-standards#restricted')}
           >restricted profile</Link
         >.</Checkbox>
     </div>
@@ -433,7 +440,7 @@ function updateKubeResult() {
         <label for="createIngress" class="block mb-1 text-sm font-medium text-[var(--pd-content-card-header-text)]"
           >Expose Service Locally Using Kubernetes Ingress:</label>
         <Checkbox
-          bind:checked="{createIngress}"
+          bind:checked={createIngress}
           class="text-[var(--pd-content-card-text)] text-sm ml-1"
           name="createIngress"
           id="createIngress"
@@ -450,14 +457,15 @@ function updateKubeResult() {
         <label for="ingress" class="block mb-1 text-sm font-medium text-[var(--pd-content-card-header-text)]"
           >Ingress Host Port:</label>
         <select
-          bind:value="{ingressPort}"
+          bind:value={ingressPort}
           name="serviceName"
           id="serviceName"
           class=" cursor-default w-full p-2 outline-none text-sm bg-[var(--pd-select-bg)] rounded-sm text-[var(--pd-content-card-text)]"
+          aria-label="Select a Port"
           required>
           <option value="" disabled selected>Select a port</option>
           {#each containerPortArray as port}
-            <option value="{port}">{port}</option>
+            <option value={port}>{port}</option>
           {/each}
         </select>
         <span class="text-[var(--pd-content-card-text)] text-sm ml-1"
@@ -472,10 +480,11 @@ function updateKubeResult() {
         <label for="routes" class="block mb-1 text-sm font-medium text-[var(--pd-content-card-header-text)]"
           >Create OpenShift routes:</label>
         <Checkbox
-          bind:checked="{deployUsingRoutes}"
+          bind:checked={deployUsingRoutes}
           class="text-[var(--pd-content-card-text)] text-sm ml-1"
           name="useRoutes"
           id="useRoutes"
+          title="Use Routes"
           required>
           Create OpenShift routes to get access to the exposed ports of this pod.</Checkbox>
       </div>
@@ -486,8 +495,9 @@ function updateKubeResult() {
         <label for="contextToUse" class="block mb-1 text-sm font-medium text-[var(--pd-content-card-header-text)]"
           >Kubernetes Context:</label>
         <Input
-          bind:value="{defaultContextName}"
+          bind:value={defaultContextName}
           name="defaultContextName"
+          aria-label="Kubernetes Context"
           id="defaultContextName"
           readonly
           class="w-full"
@@ -501,10 +511,11 @@ function updateKubeResult() {
           >Kubernetes Namespace:</label>
         <select
           class="w-full p-2 outline-none text-sm bg-[var(--pd-select-bg)] rounded-sm text-[var(--pd-content-card-text)]"
+          aria-label="Select a Kubernetes Namespace"
           name="namespaceChoice"
-          bind:value="{currentNamespace}">
+          bind:value={currentNamespace}>
           {#each allNamespaces.items as namespace}
-            <option value="{namespace.metadata?.name}">
+            <option value={namespace.metadata?.name}>
               {namespace.metadata?.name}
             </option>
           {/each}
@@ -513,32 +524,36 @@ function updateKubeResult() {
     {/if}
 
     {#if deployWarning}
-      <WarningMessage class="text-sm" error="{deployWarning}" />
+      <WarningMessage aria-label="Deploy Warning Message" class="text-sm" error={deployWarning} />
     {/if}
     {#if deployError}
-      <ErrorMessage class="text-sm" error="{deployError}" />
+      <ErrorMessage aria-label="Deploy Error Message" class="text-sm" error={deployError} />
     {/if}
 
     {#if !deployStarted}
       <div class="pt-4">
         <Button
-          on:click="{() => deployToKube()}"
+          on:click={() => deployToKube()}
           class="w-full"
-          icon="{faRocket}"
-          disabled="{bodyPod?.metadata?.name === ''}">
+          aria-label="Deploy"
+          icon={faRocket}
+          disabled={bodyPod?.metadata?.name === ''}>
           Deploy
         </Button>
       </div>
     {/if}
 
     {#if createdPod}
-      <div class="bg-charcoal-800 p-5 my-4">
+      <div class="bg-[var(--pd-content-card-inset-bg)] p-5 my-4">
         <div class="flex flex-row items-center">
           <div>Created pod:</div>
           {#if openshiftConsoleURL && createdPod?.metadata?.name}
             <div class="justify-end flex flex-1">
-              <Link class="text-sm" icon="{faExternalLink}" on:click="{() => openOpenshiftConsole()}"
-                >Open in OpenShift console</Link>
+              <Link
+                class="text-sm"
+                aria-label="Open in OpenShift Console"
+                icon={faExternalLink}
+                on:click={() => openOpenshiftConsole()}>Open in OpenShift console</Link>
             </div>
           {/if}
         </div>
@@ -581,7 +596,7 @@ function updateKubeResult() {
               {#each createdRoutes as createdRoute}
                 <li class="pt-2">
                   Port {createdRoute.spec.port?.targetPort} is reachable with route
-                  <Link on:click="{() => openRoute(createdRoute)}">{createdRoute.metadata.name}</Link>
+                  <Link on:click={() => openRoute(createdRoute)}>{createdRoute.metadata.name}</Link>
                 </li>
               {/each}
             </ul>
@@ -590,16 +605,18 @@ function updateKubeResult() {
 
         <!-- add editor for the result-->
         <div class="h-[100px] pt-2">
-          <MonacoEditor content="{jsYaml.dump(createdPod)}" language="yaml" />
+          <MonacoEditor content={jsYaml.dump(createdPod)} language="yaml" />
         </div>
       </div>
     {/if}
 
     {#if deployFinished}
       <div class="pt-4 flex flex-row space-x-2 justify-end">
-        <Button on:click="{() => goBackToHistory()}">Done</Button>
-        <Button on:click="{() => openPodDetails()}" disabled="{!createdPod?.metadata?.name || !defaultContextName}"
-          >Open Pod</Button>
+        <Button on:click={() => goBackToHistory()} aria-label="Done">Done</Button>
+        <Button
+          on:click={() => openPodDetails()}
+          disabled={!createdPod?.metadata?.name || !defaultContextName}
+          aria-label="Open Pod">Open Pod</Button>
       </div>
     {/if}
   </div>

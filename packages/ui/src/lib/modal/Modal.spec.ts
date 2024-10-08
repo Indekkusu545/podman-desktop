@@ -18,7 +18,7 @@
 
 import '@testing-library/jest-dom/vitest';
 
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -27,7 +27,7 @@ import Modal from './Modal.svelte';
 test('modal should be visible', async () => {
   render(Modal);
 
-  const bg = screen.getByLabelText('close');
+  const bg = screen.getByLabelText('fade-bg');
   expect(bg).toBeDefined();
   const dialog = screen.getByRole('dialog');
   expect(dialog).toBeDefined();
@@ -37,10 +37,20 @@ test('bg click should trigger close event', async () => {
   const closeMock = vi.fn();
   render(Modal, { onclose: closeMock });
 
-  const bg = screen.getByLabelText('close');
-  await fireEvent.click(bg);
+  const bg = screen.getByLabelText('fade-bg');
+  await userEvent.click(bg);
 
   expect(closeMock).toHaveBeenCalled();
+});
+
+test('bg click should NOT trigger close event if ignoreFocusOut is true', async () => {
+  const closeMock = vi.fn();
+  render(Modal, { onclose: closeMock, ignoreFocusOut: true });
+
+  const bg = screen.getByLabelText('fade-bg');
+  await userEvent.click(bg);
+
+  expect(closeMock).not.toHaveBeenCalled();
 });
 
 test('Escape key should trigger close', async () => {
@@ -56,7 +66,7 @@ describe('translation-y', () => {
     render(Modal);
 
     const dialog = screen.getByRole('dialog');
-    expect(dialog.classList).toContain('translate-y-[-20%]');
+    expect(dialog.classList).toContain('translate-y-[-5%]');
     expect(dialog.classList).not.toContain('my-[32px]');
   });
 
@@ -64,7 +74,7 @@ describe('translation-y', () => {
     render(Modal, { top: true });
 
     const dialog = screen.getByRole('dialog');
-    expect(dialog.classList).not.toContain('translate-y-[-20%]');
+    expect(dialog.classList).not.toContain('translate-y-[-5%]');
     // should contain margin of size status bar height
     expect(dialog.classList).toContain('my-[32px]');
   });

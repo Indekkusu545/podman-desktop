@@ -1,7 +1,7 @@
 <script lang="ts">
 import { kubernetesCurrentContextState } from '/@/stores/kubernetes-contexts-state';
 
-import type { ContextGeneralState } from '../../../../main/src/plugin/kubernetes-context-state';
+import type { ContextGeneralState } from '../../../../main/src/plugin/kubernetes/kubernetes-context-state';
 import Label from './Label.svelte';
 
 function getText(state?: ContextGeneralState): string {
@@ -18,6 +18,6 @@ $: text = getText($kubernetesCurrentContextState);
 </script>
 
 {#if $kubernetesCurrentContextState}
-  <Label role="status" name="{text}" tip="{$kubernetesCurrentContextState.error}"
+  <Label role="status" name={text} tip={$kubernetesCurrentContextState.error}
     ><div class="w-2 h-2 {getClassColor($kubernetesCurrentContextState)} rounded-full mx-1"></div></Label>
 {/if}

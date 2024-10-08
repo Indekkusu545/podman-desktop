@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (C) 2023 Red Hat, Inc.
+ * Copyright (C) 2023-2024 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ beforeEach(() => {
     addEventListener: addEventListenerMock,
     removeEventListener: vi.fn(),
   });
+  (window as any).setNativeTheme = vi.fn();
 });
 
 function getRootElement(container: HTMLElement): HTMLElement {
@@ -62,9 +63,7 @@ async function awaitRender(): Promise<RenderResult<Appearance>> {
   return result;
 }
 
-// temporary as only dark mode is supported as rendering for now
-// it should return empty later
-test('Expect dark mode using system when OS is set to light', async () => {
+test('Expect light mode using system when OS is set to light', async () => {
   (window as any).matchMedia = vi.fn().mockReturnValue({
     matches: false,
     addEventListener: vi.fn(),
@@ -74,11 +73,8 @@ test('Expect dark mode using system when OS is set to light', async () => {
   getConfigurationValueMock.mockResolvedValue(AppearanceSettings.SystemEnumValue);
 
   const { baseElement } = await awaitRender();
-
-  const val = getRootElementClassesValue(baseElement);
-
-  // expect to have class being "dark" as for now we force dark mode in system mode
-  expect(val).toBe('dark');
+  // expect to have no (dark) class as OS is using light
+  expect(getRootElementClassesValue(baseElement)).toBe('');
 });
 
 test('Expect dark mode using system when OS is set to dark', async () => {

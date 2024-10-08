@@ -21,14 +21,16 @@ $: recommendedRegistriesToInstall = registriesFilteredByIds.filter(registry =>
 );
 
 function goToAuthPage() {
-  handleNavigation(NavigationPage.AUTHENTICATION);
+  handleNavigation({
+    page: NavigationPage.AUTHENTICATION,
+  });
 }
 </script>
 
 {#each recommendedRegistriesToInstall as registry}
   <div class="text-amber-500 flex flex-row min-h-10 items-center pt-2 space-x-2">
     {#if !registry.isInstalled}
-      <FeaturedExtensionDownload extension="{registry.extensionDetails}" />
+      <FeaturedExtensionDownload extension={registry.extensionDetails} />
     {/if}
     <p>
       {registry.isInstalled ? 'Check' : 'Install'} the &nbsp;<a
@@ -38,7 +40,7 @@ function goToAuthPage() {
     </p>
 
     {#if registry.isInstalled}
-      <Button on:click="{() => goToAuthPage()}">Sign in...</Button>
+      <Button on:click={() => goToAuthPage()}>Sign in...</Button>
     {/if}
   </div>
 {/each}

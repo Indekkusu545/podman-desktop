@@ -21,7 +21,7 @@ function startCase(str: string): string {
     return str.toUpperCase();
   });
 }
-function update() {
+function update(record: IConfigurationPropertyRecordedSchema) {
   const id = record.id;
   // take string after the last dot
   const key = id?.substring(id?.lastIndexOf('.') + 1) ?? '';
@@ -40,12 +40,16 @@ function update() {
   };
 }
 $: {
-  update();
+  update(record);
 }
 
 function updateResetButtonVisibility(recordValue: any) {
   showResetButton =
     recordUI.original.default !== undefined && recordValue !== undefined && recordValue !== recordUI.original.default;
+  // when the reset button is shown we reset the value of resetToDefault
+  if (showResetButton) {
+    resetToDefault = false;
+  }
 }
 
 function doResetToDefault() {
@@ -62,38 +66,38 @@ $: resetToDefault = false;
     (!recordUI.original.enum || recordUI.original.enum.length === 0)
       ? 'w-full'
       : ''}">
-    <div class="flex flex-row text-sm text-[color:var(--pd-invert-content-card-text)]">
+    <div class="flex flex-row text-[color:var(--pd-invert-content-card-text)]">
       {recordUI.title}
       {#if showResetButton}
         <div class="ml-2">
-          <button class="text-xs text-violet-500" on:click="{() => doResetToDefault()}">
+          <button class="text-xs text-violet-500" on:click={() => doResetToDefault()}>
             <i class="fas fa-undo" aria-hidden="true"></i>
           </button>
         </div>
       {/if}
     </div>
     {#if recordUI.markdownDescription}
-      <div class="pt-1 text-[color:var(--pd-invert-content-card-text)] text-xs pr-2">
-        <Markdown>{recordUI.markdownDescription}</Markdown>
+      <div class="pt-1 text-[color:var(--pd-invert-content-card-text)] text-sm pr-2">
+        <Markdown markdown={recordUI.markdownDescription} />
       </div>
     {:else}
-      <div class="pt-1 text-[color:var(--pd-invert-content-card-text)] text-xs pr-2">{recordUI.description}</div>
+      <div class="pt-1 text-[color:var(--pd-invert-content-card-text)] text-sm pr-2">{recordUI.description}</div>
     {/if}
     {#if recordUI.original.type === 'string' && (!recordUI.original.enum || recordUI.original.enum.length === 0)}
       <PreferencesRenderingItemFormat
-        record="{recordUI.original}"
-        updateResetButtonVisibility="{updateResetButtonVisibility}"
-        resetToDefault="{resetToDefault}"
-        enableAutoSave="{true}"
-        initialValue="{getInitialValue(recordUI.original)}" />
+        record={recordUI.original}
+        updateResetButtonVisibility={updateResetButtonVisibility}
+        resetToDefault={resetToDefault}
+        enableAutoSave={true}
+        initialValue={getInitialValue(recordUI.original)} />
     {/if}
   </div>
   {#if recordUI.original.type !== 'string' || (recordUI.original.enum && recordUI.original.enum.length > 0)}
     <PreferencesRenderingItemFormat
-      record="{recordUI.original}"
-      updateResetButtonVisibility="{updateResetButtonVisibility}"
-      resetToDefault="{resetToDefault}"
-      enableAutoSave="{true}"
-      initialValue="{getInitialValue(recordUI.original)}" />
+      record={recordUI.original}
+      updateResetButtonVisibility={updateResetButtonVisibility}
+      resetToDefault={resetToDefault}
+      enableAutoSave={true}
+      initialValue={getInitialValue(recordUI.original)} />
   {/if}
 </div>

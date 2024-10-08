@@ -21,9 +21,9 @@ import { expect as playExpect } from '@playwright/test';
 
 import { ExtensionCardPage } from './extension-card-page';
 import type { ExtensionDetailsPage } from './extension-details-page';
-import { MainPage } from './main-page';
 
-export class ExtensionsPage extends MainPage {
+export class ExtensionsPage {
+  readonly page: Page;
   readonly heading: Locator;
   readonly header: Locator;
   readonly content: Locator;
@@ -33,10 +33,10 @@ export class ExtensionsPage extends MainPage {
   readonly installExtensionFromOCIImageButton: Locator;
 
   constructor(page: Page) {
-    super(page, 'extensions');
-    this.header = page.getByRole('region', { name: 'Header' });
-    this.content = page.getByRole('region', { name: 'Content' });
-    this.heading = this.header.getByLabel('Title').getByText('Extensions');
+    this.page = page;
+    this.header = page.getByRole('region', { name: 'header' });
+    this.content = page.getByRole('region', { name: 'content' });
+    this.heading = this.header.getByLabel('Title').getByText('extensions');
     this.additionalActions = this.header.getByRole('group', { name: 'additionalActions' });
     this.installedTab = this.page.getByRole('button', { name: 'Installed' });
     this.catalogTab = this.page.getByRole('button', { name: 'Catalog' });
@@ -48,7 +48,7 @@ export class ExtensionsPage extends MainPage {
     await playExpect(this.installExtensionFromOCIImageButton).toBeEnabled();
     await this.installExtensionFromOCIImageButton.click();
 
-    const dialog = this.page.getByRole('dialog', { name: 'Install Extension from OCI image' });
+    const dialog = this.page.getByRole('dialog', { name: 'Install Custom Extension', exact: true });
     await playExpect(dialog).toBeVisible();
     const imageInput = dialog.getByRole('textbox', { name: 'Image name to install custom extension' });
     // check visibility of the input

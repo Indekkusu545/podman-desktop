@@ -5,7 +5,7 @@ import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 
 import { EditorSettings } from '../../../../main/src/plugin/editor-settings';
-import { getPanelDetailColor } from '../color/color';
+import { AppearanceUtil } from '../appearance/appearance-util';
 
 let divEl: HTMLDivElement;
 let editor: monaco.editor.IStandaloneCodeEditor;
@@ -35,12 +35,18 @@ onMount(async () => {
     EditorSettings.SectionName + '.' + EditorSettings.FontSize,
   );
 
+  // check if we're in light or dark mode and get the terminal background color
+  const appearanceUtil = new AppearanceUtil();
+  const isDark = await appearanceUtil.isDarkMode();
+  const bgColor = appearanceUtil.getColor('--pd-terminal-background');
+
+  // create a theme with the current light or dark mode, but customize the background color
   Monaco.editor.defineTheme('podmanDesktopTheme', {
-    base: 'vs-dark',
+    base: isDark ? 'vs-dark' : 'vs',
     inherit: true,
-    rules: [{ token: 'custom-color', background: getPanelDetailColor() }],
+    rules: [{ token: 'custom-color', background: bgColor }],
     colors: {
-      'editor.background': getPanelDetailColor(),
+      'editor.background': bgColor,
     },
   });
 
@@ -67,4 +73,4 @@ onDestroy(() => {
 $: content, editor?.getModel()?.setValue(content);
 </script>
 
-<div bind:this="{divEl}" class="h-full"></div>
+<div bind:this={divEl} class="h-full"></div>

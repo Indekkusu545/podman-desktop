@@ -34,9 +34,11 @@ import { recommendedRegistries } from '/@/stores/recommendedRegistries';
 import type { ProviderContainerConnectionInfo, ProviderInfo } from '/@api/provider-info';
 
 // xterm is used in the UI, but not tested, added in order to avoid the multiple warnings being shown during the test.
-vi.mock('xterm', () => {
+vi.mock('@xterm/xterm', () => {
   return {
-    Terminal: vi.fn().mockReturnValue({ loadAddon: vi.fn(), open: vi.fn(), write: vi.fn(), clear: vi.fn() }),
+    Terminal: vi
+      .fn()
+      .mockReturnValue({ loadAddon: vi.fn(), open: vi.fn(), write: vi.fn(), clear: vi.fn(), dispose: vi.fn() }),
   };
 });
 
@@ -81,6 +83,7 @@ function setup() {
   const pStatus: ProviderStatus = 'started';
   const pInfo: ProviderContainerConnectionInfo = {
     name: 'test',
+    displayName: 'test',
     status: 'started',
     endpoint: {
       socketPath: '',

@@ -1,14 +1,13 @@
 <script lang="ts">
 import { faCheckCircle, faCircleArrowUp, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { Button, Link } from '@podman-desktop/ui-svelte';
+import type { Terminal } from '@xterm/xterm';
 import { onMount, tick } from 'svelte';
 import Fa from 'svelte-fa';
 import { router } from 'tinro';
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
 
-import { TerminalSettings } from '../../../../main/src/plugin/terminal-settings';
 import Dialog from '../dialogs/Dialog.svelte';
+import TerminalWindow from '../ui/TerminalWindow.svelte';
 import type { ImageInfoUI } from './ImageInfoUI';
 
 export let closeCallback: () => void;
@@ -16,6 +15,7 @@ export let imageInfoToPush: ImageInfoUI;
 
 let pushInProgress = false;
 let pushFinished = false;
+let initTerminal = false;
 let logsPush: Terminal;
 
 let selectedImageTag = '';
@@ -29,46 +29,9 @@ onMount(async () => {
   }
 });
 
-let terminalIntialized = false;
-
-async function initTerminal() {
-  if (terminalIntialized) {
-    return;
-  }
-
-  // missing element, return
-  if (!pushLogsXtermDiv) {
-    return;
-  }
-
-  // grab font size
-  const fontSize = await window.getConfigurationValue<number>(
-    TerminalSettings.SectionName + '.' + TerminalSettings.FontSize,
-  );
-  const lineHeight = await window.getConfigurationValue<number>(
-    TerminalSettings.SectionName + '.' + TerminalSettings.LineHeight,
-  );
-
-  logsPush = new Terminal({ fontSize, lineHeight, disableStdin: true });
-  const fitAddon = new FitAddon();
-  logsPush.loadAddon(fitAddon);
-
-  logsPush.open(pushLogsXtermDiv);
-  // disable cursor
-  logsPush.write('\x1b[?25l');
-
-  // call fit addon each time we resize the window
-  window.addEventListener('resize', () => {
-    fitAddon.fit();
-  });
-  fitAddon.fit();
-  terminalIntialized = true;
-}
-
 async function pushImage(imageTag: string) {
   gotErrorDuringPush = false;
-  await tick();
-  await initTerminal();
+  initTerminal = true;
   await tick();
   logsPush?.reset();
 
@@ -103,7 +66,6 @@ function callback(name: string, data: string) {
     pushInProgress = false;
   }
 }
-let pushLogsXtermDiv: HTMLDivElement;
 
 let isAuthenticatedForThisImage = false;
 $: window.hasAuthconfigForImage(imageInfoToPush.name).then(result => (isAuthenticatedForThisImage = result));
@@ -111,16 +73,16 @@ $: window.hasAuthconfigForImage(imageInfoToPush.name).then(result => (isAuthenti
 
 <Dialog
   title="Push image"
-  on:close="{() => {
+  on:close={() => {
     closeCallback();
-  }}">
+  }}>
   <div slot="content" class="flex flex-col text-sm leading-5 space-y-5">
     <div class="pb-4">
       <label for="modalImageTag" class="block mb-2 text-sm font-medium text-[var(--pd-modal-text)]">Image tag</label>
       {#if isAuthenticatedForThisImage}
-        <Fa class="absolute mt-3 ml-1.5 text-green-300" size="1x" icon="{faCheckCircle}" />
+        <Fa class="absolute mt-3 ml-1.5 text-green-300" size="1x" icon={faCheckCircle} />
       {:else}
-        <Fa class="absolute mt-3 ml-1.5 text-amber-500" size="1x" icon="{faTriangleExclamation}" />
+        <Fa class="absolute mt-3 ml-1.5 text-amber-500" size="1x" icon={faTriangleExclamation} />
       {/if}
 
       <select
@@ -128,40 +90,42 @@ $: window.hasAuthconfigForImage(imageInfoToPush.name).then(result => (isAuthenti
           ? 'outline-gray-900'
           : 'outline-amber-500'} placeholder-gray-700 text-white"
         name="imageChoice"
-        bind:value="{selectedImageTag}">
+        bind:value={selectedImageTag}>
         {#each imageTags as imageTag}
-          <option value="{imageTag}">{imageTag}</option>
+          <option value={imageTag}>{imageTag}</option>
         {/each}
       </select>
       <!-- If the image is UNAUTHENTICATED, show a warning that the image is unable to be pushed
       and to click to go to the registries page -->
       {#if !isAuthenticatedForThisImage}
         <p class="text-amber-500 pt-1">
-          No registry with push permissions found. <Link on:click="{() => router.goto('/preferences/registries')}"
+          No registry with push permissions found. <Link on:click={() => router.goto('/preferences/registries')}
             >Add a registry now.</Link>
         </p>{/if}
     </div>
 
-    <div bind:this="{pushLogsXtermDiv}"></div>
+    <div class="max-h-[185px]" hidden={initTerminal === false}>
+      <TerminalWindow bind:terminal={logsPush} disableStdIn />
+    </div>
   </div>
 
   <svelte:fragment slot="buttons">
     {#if !pushInProgress && !pushFinished}
-      <Button class="w-auto" type="secondary" on:click="{() => closeCallback()}">Cancel</Button>
+      <Button class="w-auto" type="secondary" on:click={() => closeCallback()}>Cancel</Button>
     {/if}
     {#if !pushFinished}
       <Button
         class="w-auto"
-        icon="{faCircleArrowUp}"
-        disabled="{!isAuthenticatedForThisImage}"
-        on:click="{() => {
+        icon={faCircleArrowUp}
+        disabled={!isAuthenticatedForThisImage}
+        on:click={() => {
           pushImage(selectedImageTag);
-        }}"
-        bind:inProgress="{pushInProgress}">
+        }}
+        bind:inProgress={pushInProgress}>
         Push image
       </Button>
     {:else}
-      <Button on:click="{() => pushImageFinished()}" class="w-auto">Done</Button>
+      <Button on:click={() => pushImageFinished()} class="w-auto">Done</Button>
     {/if}
   </svelte:fragment>
 </Dialog>
